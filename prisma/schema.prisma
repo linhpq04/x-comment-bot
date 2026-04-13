@@ -1,0 +1,133 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:../data/comment-bot.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Twitter accounts to monitor and comment on
+model TargetAccount {
+  id        String   @id @default(cuid())
+  handle    String   @unique // @username (without @)
+  lang      String   // "en"
+  name      String   @default("")
+  userId    String   @default("") // Twitter user ID (cached)
+  isActive  Boolean  @default(true)
+  priority  Int      @default(0) // higher = higher priority
+  createdAt DateTime @default(now())
+
+  tweets    MonitoredTweet[]
+  comments  PostedComment[]
+}
+
+// Discovered tweets, pending or already commented
+model MonitoredTweet {
+  id              String        @id @default(cuid())
+  tweetId         String        @unique
+  accountId       String
+  account         TargetAccount @relation(fields: [accountId], references: [id])
+  authorHandle    String
+  text            String
+  tweetCreatedAt  DateTime
+  discoveredAt    DateTime      @default(now())
+
+  // Processing status
+  status          String        @default("pending")
+  // pending | commented | skipped | failed
+
+  comment         PostedComment?
+
+  @@index([status])
+  @@index([tweetCreatedAt])
+}
+
+// Posted comments
+model PostedComment {
+  id            String         @id @default(cuid())
+  tweetId       String         @unique
+  tweet         MonitoredTweet @relation(fields: [tweetId], references: [id])
+  accountId     String
+  account       TargetAccount  @relation(fields: [accountId], references: [id])
+  commentId     String         // reply tweet ID returned from X
+  commentText   String
+  lang          String         // "en"
+  timeSlot      String         // time slot name
+  postedAt      DateTime       @default(now())
+
+  @@index([postedAt])
+}
+
+// System settings (key-value)
+model Setting {
+  key   String @id
+  value String
+}
+
+// Posts that belong to the bot owner — we watch who comments on these
+model WatchedPost {
+  id        String   @id @default(cuid())
+  tweetId   String   @unique   // numeric tweet ID
+  url       String             // original URL the user provided
+  label     String   @default("") // optional label
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  reactions WatcherReaction[]
+}
+
+// Each time we react to someone who commented on a watched post
+model WatcherReaction {
+  id               String      @id @default(cuid())
+  watchedPostId    String
+  watchedPost      WatchedPost @relation(fields: [watchedPostId], references: [id])
+  commentId        String      @unique  // ID of the comment on our post
+  commenterHandle  String
+  targetTweetId    String      // their latest tweet we commented on
+  targetTweetText  String
+  commentText      String      @default("")
+  postedCommentId  String      @default("")
+  liked            Boolean     @default(false)
+  status           String      // commented | skipped | failed
+  skipReason       String      @default("")
+  createdAt        DateTime    @default(now())
+
+  @@index([createdAt])
+}
+
+// Logs
+model Log {
+  id        String   @id @default(cuid())
+  level     String   // info | warn | error
+  module    String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// Telegram groups được cấu hình để scan topic
+model TelegramGroup {
+  id        String          @id @default(cuid())
+  chatId    String          @unique  // Telegram chat ID (dạng -100xxxxxxxxxx)
+  name      String                   // Tên hiển thị
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+
+  topics    TelegramTopic[]
+}
+
+// Các topic trong group
+model TelegramTopic {
+  id        String        @id @default(cuid())
+  groupId   String
+  group     TelegramGroup @relation(fields: [groupId], references: [id])
+  threadId  Int                      // message_thread_id của topic
+  name      String                   // Tên topic (VD: "POST 1 ĐÓNG 9H30")
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+
+  @@unique([groupId, threadId])
+  @@index([groupId])
+}

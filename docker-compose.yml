@@ -2,6 +2,8 @@ version: "3.8"
 
 services:
   app:
+    image: comment-bot:v1.0.0
+    container_name: comment-bot
     build:
       context: .
       dockerfile: Dockerfile
@@ -9,7 +11,8 @@ services:
     env_file:
       - .env
     volumes:
-      - ./data:/data # SQLite db persistent
-      - ./twitter-cookies.json:/app/twitter-cookies.json:ro # cookie file nếu có
+      - ./data:/data
+      - ./twitter-cookies.json:/app/twitter-cookies.json:ro
     ports:
       - "3000:3000"
+    user: "0:0"

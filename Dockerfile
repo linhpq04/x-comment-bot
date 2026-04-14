@@ -1,35 +1,45 @@
 # ── Stage 1: Build TypeScript ──────────────────────────────
-FROM node:22 AS builder
+FROM node:22-slim AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
 RUN npm run build
 
-# ── Stage 2: Install prod deps + Playwright ────────────────
-FROM node:22 AS installer
+# ── Stage 2: Install prod deps + Playwright Chromium ───────
+FROM node:22-slim AS installer
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package*.json ./
 RUN npm ci --omit=dev
 RUN npm run db:generate
-RUN npx playwright install --with-deps chromium
+RUN PLAYWRIGHT_BROWSERS_PATH=/pw-browsers \
+    npx playwright install --with-deps chromium && \
+    rm -rf /pw-browsers/chromium_headless_shell-* \
+           /pw-browsers/ffmpeg-* && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# ── Stage 3: Runner ────────────────────────────────────────
-FROM node:22 AS runner
-WORKDIR /app
+# ── Stage 3: Runner (slim) ─────────────────────────────────
+FROM node:22-slim AS runner
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+    libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+    libxrandr2 libgbm1 libasound2 libpango-1.0-0 libpangocairo-1.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system --gid 1001 botuser && \
     useradd --system --uid 1001 --gid 1001 botuser && \
-    mkdir -p /data /home/botuser/.cache && \
-    chown -R botuser:botuser /data /home/botuser/.cache
+    mkdir -p /home/botuser/.cache/ms-playwright && \
+    chown -R botuser:botuser /home/botuser
 
-COPY --from=installer /app .
-COPY --from=installer /root/.cache/ms-playwright /home/botuser/.cache/ms-playwright
-RUN chown -R botuser:botuser /app /home/botuser/.cache
+WORKDIR /app
 
-USER botuser
+COPY --from=installer --chown=botuser:botuser /app .
+COPY --from=installer --chown=botuser:botuser /pw-browsers /home/botuser/.cache/ms-playwright
 
-# db:push tạo/migrate SQLite lúc start, rồi chạy app
-CMD ["sh", "-c", "npm run db:push && npm start"]
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/botuser/.cache/ms-playwright
+
+CMD ["sh", "-c", "mkdir -p /data && npm run db:push && npm start"]

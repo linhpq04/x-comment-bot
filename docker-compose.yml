@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME:latest
+    image: ghcr.io/linhpq04/x-comment-bot:latest
     container_name: comment-bot
     restart: unless-stopped
     env_file:

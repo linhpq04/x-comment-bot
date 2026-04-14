@@ -135,7 +135,12 @@ export async function monitorAccounts(lang: Lang): Promise<number> {
     if (rateLimited) break;
 
     const results = await Promise.allSettled(
-      batch.map((acc) => monitorOne(client, acc)),
+      batch.map((acc) =>
+        monitorOne(
+          client,
+          acc as { id: string; handle: string; userId: string },
+        ),
+      ),
     );
 
     for (const result of results) {
@@ -274,7 +279,7 @@ async function monitorOne(
         where: { tweetId: { in: tweetIds } },
         select: { tweetId: true },
       })
-    ).map((r) => r.tweetId),
+    ).map((r: { tweetId: string }) => r.tweetId),
   );
 
   const toInsert = validTweets.filter((t) => !existingSet.has(t.id));

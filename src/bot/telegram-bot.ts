@@ -2,9 +2,18 @@ import TelegramBot from "node-telegram-bot-api";
 import { config } from "../config.js";
 import { db } from "../db.js";
 import { logger } from "../utils/logger.js";
-import { getActiveSlotNames, formatTimeSlotsTable } from "../scheduler/timeslots.js";
+import {
+  getActiveSlotNames,
+  formatTimeSlotsTable,
+} from "../scheduler/timeslots.js";
 import { getCommentStats } from "../commenter/twitter-commenter.js";
-import { triggerMonitor, triggerComment, enableMonitor, disableMonitor, isMonitorEnabled } from "../scheduler/index.js";
+import {
+  triggerMonitor,
+  triggerComment,
+  enableMonitor,
+  disableMonitor,
+  isMonitorEnabled,
+} from "../scheduler/index.js";
 import { extractTweetId } from "../watcher/post-watcher.js";
 import { triggerWatcherNow } from "../watcher/watcher-cycle.js";
 import {
@@ -100,7 +109,7 @@ export function startBot(): TelegramBot {
         `📋 /listtopics — Xem danh sách group & topic\n` +
         `🔎 /detecttopic — Gửi trong topic để lấy thread_id\n` +
         `🔍 /scantopics <chat_id> HH:MM HH:MM [ids...] — Quét link X`,
-      true
+      true,
     );
   });
 
@@ -117,7 +126,10 @@ export function startBot(): TelegramBot {
         create: { handle, lang: "en", name, isActive: true },
         update: { lang: "en", name, isActive: true },
       });
-      await safeSend(msg.chat.id, `✅ Added @${handle} (🇺🇸 EN) to the watch list`);
+      await safeSend(
+        msg.chat.id,
+        `✅ Added @${handle} (🇺🇸 EN) to the watch list`,
+      );
       logger.info("bot", `Admin added EN account: @${handle}`);
     } catch (err: any) {
       await safeSend(msg.chat.id, `❌ Error: ${err.message}`);
@@ -157,7 +169,7 @@ export function startBot(): TelegramBot {
     if (all.length === 0) {
       await safeSend(
         msg.chat.id,
-        "📭 No accounts yet.\n\nUse /addaccount @handle to add an account"
+        "📭 No accounts yet.\n\nUse /addaccount @handle to add an account",
       );
       return;
     }
@@ -210,7 +222,7 @@ export function startBot(): TelegramBot {
     await safeSend(
       msg.chat.id,
       `${table}\n\n🟢 *Currently active:* ${active}`,
-      true
+      true,
     );
   });
 
@@ -246,8 +258,13 @@ export function startBot(): TelegramBot {
     await safeSend(msg.chat.id, "🔄 Monitoring for new tweets...");
     try {
       await triggerMonitor();
-      const pending = await db.monitoredTweet.count({ where: { status: "pending" } });
-      await safeSend(msg.chat.id, `✅ Done! ${pending} tweets waiting for comment`);
+      const pending = await db.monitoredTweet.count({
+        where: { status: "pending" },
+      });
+      await safeSend(
+        msg.chat.id,
+        `✅ Done! ${pending} tweets waiting for comment`,
+      );
     } catch (err: any) {
       await safeSend(msg.chat.id, `❌ Error: ${err.message}`);
     }
@@ -257,7 +274,10 @@ export function startBot(): TelegramBot {
   bot.onText(/\/commentnow/, async (msg) => {
     if (!isAdmin(msg.from!.id)) return;
     const activeSlot = getActiveSlotNames();
-    await safeSend(msg.chat.id, `💬 Running comment cycle...\n⏰ Slot: ${activeSlot}`);
+    await safeSend(
+      msg.chat.id,
+      `💬 Running comment cycle...\n⏰ Slot: ${activeSlot}`,
+    );
     try {
       await triggerComment();
       await safeSend(msg.chat.id, "✅ Comment cycle complete!");
@@ -282,14 +302,26 @@ export function startBot(): TelegramBot {
 
     const lines = logs
       .reverse()
-      .map((l) => {
-        const icon = l.level === "error" ? "🔴" : l.level === "warn" ? "🟡" : "⚪";
-        const time = l.createdAt.toISOString().slice(11, 19);
-        return `${icon} [${time}] [${l.module}] ${l.message}`;
-      })
+      .map(
+        (l: {
+          level: string;
+          createdAt: Date;
+          module: string;
+          message: string;
+        }) => {
+          const icon =
+            l.level === "error" ? "🔴" : l.level === "warn" ? "🟡" : "⚪";
+          const time = l.createdAt.toISOString().slice(11, 19);
+          return `${icon} [${time}] [${l.module}] ${l.message}`;
+        },
+      )
       .join("\n");
 
-    await safeSend(msg.chat.id, `📝 *Recent logs:*\n\`\`\`\n${lines}\n\`\`\``, true);
+    await safeSend(
+      msg.chat.id,
+      `📝 *Recent logs:*\n\`\`\`\n${lines}\n\`\`\``,
+      true,
+    );
   });
 
   // ── /watchpost <url> [label] — add a post to watch ───────────────────────
@@ -301,7 +333,10 @@ export function startBot(): TelegramBot {
 
     const tweetId = extractTweetId(url);
     if (!tweetId) {
-      await safeSend(msg.chat.id, "❌ Invalid URL. Example:\n/watchpost https://x.com/yourhandle/status/1234567890");
+      await safeSend(
+        msg.chat.id,
+        "❌ Invalid URL. Example:\n/watchpost https://x.com/yourhandle/status/1234567890",
+      );
       return;
     }
 
@@ -314,7 +349,7 @@ export function startBot(): TelegramBot {
       await safeSend(
         msg.chat.id,
         `✅ Now watching post:\n🔗 ${url}${label ? `\n🏷 ${label}` : ""}\n\n` +
-        `Bot will auto-comment on the latest tweet of anyone who comments on this post.`,
+          `Bot will auto-comment on the latest tweet of anyone who comments on this post.`,
       );
       logger.info("bot", `Admin added watched post: ${tweetId}`);
     } catch (err: any) {
@@ -331,10 +366,16 @@ export function startBot(): TelegramBot {
     try {
       const post = await db.watchedPost.findUnique({ where: { tweetId } });
       if (!post) {
-        await safeSend(msg.chat.id, `⚠️ Post ${tweetId} not found in watch list`);
+        await safeSend(
+          msg.chat.id,
+          `⚠️ Post ${tweetId} not found in watch list`,
+        );
         return;
       }
-      await db.watchedPost.update({ where: { tweetId }, data: { isActive: false } });
+      await db.watchedPost.update({
+        where: { tweetId },
+        data: { isActive: false },
+      });
       await safeSend(msg.chat.id, `✅ Stopped watching post ${tweetId}`);
       logger.info("bot", `Admin removed watched post: ${tweetId}`);
     } catch (err: any) {
@@ -346,7 +387,9 @@ export function startBot(): TelegramBot {
   bot.onText(/\/watchedposts/, async (msg) => {
     if (!isAdmin(msg.from!.id)) return;
 
-    const posts = await db.watchedPost.findMany({ orderBy: { createdAt: "desc" } });
+    const posts = await db.watchedPost.findMany({
+      orderBy: { createdAt: "desc" },
+    });
     if (posts.length === 0) {
       await safeSend(
         msg.chat.id,
@@ -358,7 +401,9 @@ export function startBot(): TelegramBot {
     let text = `👁 *Watched Posts (${posts.length}):*\n\n`;
     for (const p of posts) {
       const status = p.isActive ? "✅" : "⏸";
-      const reactionCount = await db.watcherReaction.count({ where: { watchedPostId: p.id } });
+      const reactionCount = await db.watcherReaction.count({
+        where: { watchedPostId: p.id },
+      });
       text += `${status} ${p.label || p.tweetId}\n`;
       text += `   🔗 ${p.url}\n`;
       text += `   💬 ${reactionCount} reactions\n\n`;
@@ -385,7 +430,8 @@ export function startBot(): TelegramBot {
     let text = `📜 *Recent watcher reactions (${recent.length}):*\n\n`;
     for (const r of recent) {
       const time = r.createdAt.toISOString().replace("T", " ").slice(0, 16);
-      const icon = r.status === "commented" ? "✅" : r.status === "skipped" ? "⏭" : "❌";
+      const icon =
+        r.status === "commented" ? "✅" : r.status === "skipped" ? "⏭" : "❌";
       text += `${icon} *@${r.commenterHandle}* — ${time}\n`;
       if (r.status === "commented") {
         text += `   _"${r.commentText.slice(0, 80)}${r.commentText.length > 80 ? "…" : ""}"_\n`;
@@ -432,17 +478,20 @@ export function startBot(): TelegramBot {
       await safeSend(
         msg.chat.id,
         `📋 *Cách dùng /commenturls:*\n\n` +
-        `Gửi kèm list URL, mỗi dòng 1 URL:\n` +
-        `\`\`\`\n/commenturls\nhttps://x.com/user1/status/111\nhttps://x.com/user2/status/222\n\`\`\`\n\n` +
-        `Hoặc cách nhau bằng dấu phẩy:\n` +
-        `\`\`\`\n/commenturls url1, url2, url3\n\`\`\``,
+          `Gửi kèm list URL, mỗi dòng 1 URL:\n` +
+          `\`\`\`\n/commenturls\nhttps://x.com/user1/status/111\nhttps://x.com/user2/status/222\n\`\`\`\n\n` +
+          `Hoặc cách nhau bằng dấu phẩy:\n` +
+          `\`\`\`\n/commenturls url1, url2, url3\n\`\`\``,
         true,
       );
       return;
     }
 
     if (isUrgentRunning()) {
-      await safeSend(msg.chat.id, "⚠️ Đang có urgent job chạy rồi, đợi xong nhé!");
+      await safeSend(
+        msg.chat.id,
+        "⚠️ Đang có urgent job chạy rồi, đợi xong nhé!",
+      );
       return;
     }
 
@@ -472,17 +521,20 @@ export function startBot(): TelegramBot {
       await safeSend(
         msg.chat.id,
         `📋 *Cách dùng /commentaccounts:*\n\n` +
-        `Gửi kèm list @handle, mỗi dòng 1 handle:\n` +
-        `\`\`\`\n/commentaccounts\n@handle1\n@handle2\n\`\`\`\n\n` +
-        `Hoặc cách nhau bằng dấu phẩy:\n` +
-        `\`\`\`\n/commentaccounts @handle1, @handle2, @handle3\n\`\`\``,
+          `Gửi kèm list @handle, mỗi dòng 1 handle:\n` +
+          `\`\`\`\n/commentaccounts\n@handle1\n@handle2\n\`\`\`\n\n` +
+          `Hoặc cách nhau bằng dấu phẩy:\n` +
+          `\`\`\`\n/commentaccounts @handle1, @handle2, @handle3\n\`\`\``,
         true,
       );
       return;
     }
 
     if (isUrgentRunning()) {
-      await safeSend(msg.chat.id, "⚠️ Đang có urgent job chạy rồi, đợi xong nhé!");
+      await safeSend(
+        msg.chat.id,
+        "⚠️ Đang có urgent job chạy rồi, đợi xong nhé!",
+      );
       return;
     }
 
@@ -497,11 +549,19 @@ export function startBot(): TelegramBot {
   bot.onText(/\/monitoron/, async (msg) => {
     if (!isAdmin(msg.from!.id)) return;
     if (isMonitorEnabled()) {
-      await safeSend(msg.chat.id, "✅ Monitor đang *BẬT* rồi, không cần làm gì thêm.", true);
+      await safeSend(
+        msg.chat.id,
+        "✅ Monitor đang *BẬT* rồi, không cần làm gì thêm.",
+        true,
+      );
       return;
     }
     enableMonitor();
-    await safeSend(msg.chat.id, "✅ *Monitor đã BẬT!*\nBot sẽ tiếp tục crawl tweet theo lịch.", true);
+    await safeSend(
+      msg.chat.id,
+      "✅ *Monitor đã BẬT!*\nBot sẽ tiếp tục crawl tweet theo lịch.",
+      true,
+    );
     logger.info("bot", "Admin bật monitor");
   });
 
@@ -513,7 +573,11 @@ export function startBot(): TelegramBot {
       return;
     }
     disableMonitor();
-    await safeSend(msg.chat.id, "⏸ *Monitor đã TẮT!*\nBot sẽ không crawl tweet cho đến khi bật lại bằng /monitoron.", true);
+    await safeSend(
+      msg.chat.id,
+      "⏸ *Monitor đã TẮT!*\nBot sẽ không crawl tweet cho đến khi bật lại bằng /monitoron.",
+      true,
+    );
     logger.info("bot", "Admin tắt monitor");
   });
 
@@ -533,19 +597,26 @@ export function startBot(): TelegramBot {
     const name = parts.slice(1).join(" ") || chatId;
 
     if (!chatId.match(/^-?\d+$/)) {
-      await safeSend(msg.chat.id,
+      await safeSend(
+        msg.chat.id,
         `❌ Chat ID không hợp lệ. Phải là số, VD: \`-1001234567890\`\n\n` +
-        `*Cách lấy chat_id:*\n` +
-        `1. Thêm bot vào group\n` +
-        `2. Gửi 1 tin nhắn bất kỳ trong group\n` +
-        `3. Mở: \`https://api.telegram.org/bot<TOKEN>/getUpdates\`\n` +
-        `4. Tìm trường \`"chat":{"id":...\``, true);
+          `*Cách lấy chat_id:*\n` +
+          `1. Thêm bot vào group\n` +
+          `2. Gửi 1 tin nhắn bất kỳ trong group\n` +
+          `3. Mở: \`https://api.telegram.org/bot<TOKEN>/getUpdates\`\n` +
+          `4. Tìm trường \`"chat":{"id":...\``,
+        true,
+      );
       return;
     }
 
     try {
       await addGroup(chatId, name);
-      await safeSend(msg.chat.id, `✅ Đã đăng ký group *${name}* (ID: \`${chatId}\`)`, true);
+      await safeSend(
+        msg.chat.id,
+        `✅ Đã đăng ký group *${name}* (ID: \`${chatId}\`)`,
+        true,
+      );
       logger.info("bot", `Admin đăng ký group: ${chatId} — ${name}`);
     } catch (err: any) {
       await safeSend(msg.chat.id, `❌ Lỗi: ${err.message}`);
@@ -577,12 +648,15 @@ export function startBot(): TelegramBot {
     if (!isAdmin(msg.from!.id)) return;
     const parts = match![1].trim().split(/\s+/);
     if (parts.length < 3) {
-      await safeSend(msg.chat.id,
+      await safeSend(
+        msg.chat.id,
         `📋 *Cách dùng /addtopic:*\n\n` +
-        `\`/addtopic <chat_id> <thread_id> <tên topic>\`\n\n` +
-        `*Ví dụ:*\n` +
-        `\`/addtopic -1001234567890 101 POST 1 ĐÓNG 9H30\`\n\n` +
-        `*Cách lấy thread_id:* Vào topic đó và dùng lệnh /detecttopic`, true);
+          `\`/addtopic <chat_id> <thread_id> <tên topic>\`\n\n` +
+          `*Ví dụ:*\n` +
+          `\`/addtopic -1001234567890 101 POST 1 ĐÓNG 9H30\`\n\n` +
+          `*Cách lấy thread_id:* Vào topic đó và dùng lệnh /detecttopic`,
+        true,
+      );
       return;
     }
     const chatId = parts[0];
@@ -596,11 +670,17 @@ export function startBot(): TelegramBot {
 
     try {
       await addTopic(chatId, threadId, name);
-      await safeSend(msg.chat.id,
+      await safeSend(
+        msg.chat.id,
         `✅ Đã thêm topic *${name}*\n` +
-        `  📌 Group: \`${chatId}\`\n` +
-        `  🧵 Thread ID: \`${threadId}\``, true);
-      logger.info("bot", `Admin thêm topic: group ${chatId} thread ${threadId} — ${name}`);
+          `  📌 Group: \`${chatId}\`\n` +
+          `  🧵 Thread ID: \`${threadId}\``,
+        true,
+      );
+      logger.info(
+        "bot",
+        `Admin thêm topic: group ${chatId} thread ${threadId} — ${name}`,
+      );
     } catch (err: any) {
       await safeSend(msg.chat.id, `❌ Lỗi: ${err.message}`);
     }
@@ -612,14 +692,21 @@ export function startBot(): TelegramBot {
     if (!isAdmin(msg.from!.id)) return;
     const parts = match![1].trim().split(/\s+/);
     if (parts.length < 2) {
-      await safeSend(msg.chat.id, `📋 Cách dùng: \`/removetopic <chat_id> <thread_id>\``, true);
+      await safeSend(
+        msg.chat.id,
+        `📋 Cách dùng: \`/removetopic <chat_id> <thread_id>\``,
+        true,
+      );
       return;
     }
     const chatId = parts[0];
     const threadId = parseInt(parts[1]);
     try {
       await removeTopic(chatId, threadId);
-      await safeSend(msg.chat.id, `✅ Đã xóa topic \`${threadId}\` khỏi group \`${chatId}\``);
+      await safeSend(
+        msg.chat.id,
+        `✅ Đã xóa topic \`${threadId}\` khỏi group \`${chatId}\``,
+      );
     } catch (err: any) {
       await safeSend(msg.chat.id, `❌ Lỗi: ${err.message}`);
     }
@@ -632,8 +719,11 @@ export function startBot(): TelegramBot {
     try {
       const groups = await getAllGroups();
       if (groups.length === 0) {
-        await safeSend(msg.chat.id,
-          `📭 Chưa có group nào.\n\nDùng /addgroup để thêm.`, true);
+        await safeSend(
+          msg.chat.id,
+          `📭 Chưa có group nào.\n\nDùng /addgroup để thêm.`,
+          true,
+        );
         return;
       }
       const cacheStats = getCacheStats();
@@ -649,7 +739,10 @@ export function startBot(): TelegramBot {
           for (const t of g.topics) {
             const cached = cacheMap.get(`${g.chatId}:${t.threadId}`) ?? 0;
             text += `   🧵 \`${t.threadId}\` — *${t.name}*`;
-            text += cached > 0 ? ` _(${cached} links cached)_\n` : ` _(chưa có cache)_\n`;
+            text +=
+              cached > 0
+                ? ` _(${cached} links cached)_\n`
+                : ` _(chưa có cache)_\n`;
           }
         }
         text += "\n";
@@ -673,18 +766,24 @@ export function startBot(): TelegramBot {
     const chatTitle = msg.chat.title ?? "(không có tên)";
 
     if (!threadId) {
-      await safeSend(msg.chat.id,
-        `⚠️ Lệnh này phải gửi *bên trong một topic* của supergroup, không phải chat thường.`, true);
+      await safeSend(
+        msg.chat.id,
+        `⚠️ Lệnh này phải gửi *bên trong một topic* của supergroup, không phải chat thường.`,
+        true,
+      );
       return;
     }
 
-    await safeSend(msg.chat.id,
+    await safeSend(
+      msg.chat.id,
       `✅ *Thông tin topic này:*\n\n` +
-      `📁 Group: *${chatTitle}*\n` +
-      `🆔 Chat ID: \`${chatId}\`\n` +
-      `🧵 Thread ID: \`${threadId}\`\n\n` +
-      `*Copy lệnh để thêm topic này:*\n` +
-      `\`/addtopic ${chatId} ${threadId} Tên Topic\``, true);
+        `📁 Group: *${chatTitle}*\n` +
+        `🆔 Chat ID: \`${chatId}\`\n` +
+        `🧵 Thread ID: \`${threadId}\`\n\n` +
+        `*Copy lệnh để thêm topic này:*\n` +
+        `\`/addtopic ${chatId} ${threadId} Tên Topic\``,
+      true,
+    );
   });
 
   // ── /scantopics <chat_id> HH:MM HH:MM [thread_id ...] ────────────────────
@@ -699,41 +798,61 @@ export function startBot(): TelegramBot {
     const args = (match![1] ?? "").trim().split(/\s+/).filter(Boolean);
     const timeRegex = /^\d{1,2}:\d{2}$/;
 
-    if (args.length < 3 || !args[0].match(/^-?\d+$/) || !timeRegex.test(args[1]) || !timeRegex.test(args[2])) {
+    if (
+      args.length < 3 ||
+      !args[0].match(/^-?\d+$/) ||
+      !timeRegex.test(args[1]) ||
+      !timeRegex.test(args[2])
+    ) {
       const groups = await getAllGroups().catch(() => []);
-      let groupList = groups.length === 0
-        ? "_Chưa có group nào — dùng /addgroup để thêm_"
-        : groups.map((g) =>
-            `  \`${g.chatId}\` — *${g.name}* (${g.topics.length} topics)`
-          ).join("\n");
+      let groupList =
+        groups.length === 0
+          ? "_Chưa có group nào — dùng /addgroup để thêm_"
+          : groups
+              .map(
+                (g: { chatId: string; name: string; topics: unknown[] }) =>
+                  `  \`${g.chatId}\` — *${g.name}* (${g.topics.length} topics)`,
+              )
+              .join("\n");
 
-      await safeSend(msg.chat.id,
+      await safeSend(
+        msg.chat.id,
         `📋 *Cách dùng /scantopics:*\n\n` +
-        `\`/scantopics <chat_id> HH:MM HH:MM [thread_id ...]\`\n\n` +
-        `*Ví dụ:*\n` +
-        `\`/scantopics -1001234567890 07:00 19:00\` — quét hết topic\n` +
-        `\`/scantopics -1001234567890 07:00 19:00 101 102\` — chỉ quét topic 101, 102\n\n` +
-        `*📁 Groups đã đăng ký:*\n${groupList}\n\n` +
-        `_Xem chi tiết topic: /listtopics_`, true);
+          `\`/scantopics <chat_id> HH:MM HH:MM [thread_id ...]\`\n\n` +
+          `*Ví dụ:*\n` +
+          `\`/scantopics -1001234567890 07:00 19:00\` — quét hết topic\n` +
+          `\`/scantopics -1001234567890 07:00 19:00 101 102\` — chỉ quét topic 101, 102\n\n` +
+          `*📁 Groups đã đăng ký:*\n${groupList}\n\n` +
+          `_Xem chi tiết topic: /listtopics_`,
+        true,
+      );
       return;
     }
 
     const chatId = args[0];
     const fromTime = args[1];
     const toTime = args[2];
-    const filterIds = args.slice(3).map(Number).filter((n) => !isNaN(n));
+    const filterIds = args
+      .slice(3)
+      .map(Number)
+      .filter((n) => !isNaN(n));
 
-    await safeSend(msg.chat.id,
-      `🔍 Đang quét group \`${chatId}\` từ *${fromTime}* đến *${toTime}*...`, true);
+    await safeSend(
+      msg.chat.id,
+      `🔍 Đang quét group \`${chatId}\` từ *${fromTime}* đến *${toTime}*...`,
+      true,
+    );
 
     try {
       const results = await scanTopics(chatId, filterIds, fromTime, toTime);
 
       if (results.length === 0) {
-        await safeSend(msg.chat.id,
+        await safeSend(
+          msg.chat.id,
           `📭 Không tìm thấy link X.com nào trong khoảng *${fromTime}* — *${toTime}*\n\n` +
-          `💡 _Bot chỉ cache tin nhắn kể từ lúc khởi động. Nếu link được gửi trước đó sẽ không lấy được._`,
-          true);
+            `💡 _Bot chỉ cache tin nhắn kể từ lúc khởi động. Nếu link được gửi trước đó sẽ không lấy được._`,
+          true,
+        );
         return;
       }
 
@@ -746,10 +865,13 @@ export function startBot(): TelegramBot {
         await safeSend(msg.chat.id, text, true);
       }
 
-      await safeSend(msg.chat.id,
+      await safeSend(
+        msg.chat.id,
         `✅ *Tổng kết:* ${totalLinks} link X.com từ ${results.length} topic\n` +
-        `⏰ *${fromTime}* → *${toTime}*\n\n` +
-        `_Dùng /commenturls + paste các link trên để comment ngay_`, true);
+          `⏰ *${fromTime}* → *${toTime}*\n\n` +
+          `_Dùng /commenturls + paste các link trên để comment ngay_`,
+        true,
+      );
     } catch (err: any) {
       await safeSend(msg.chat.id, `❌ Lỗi: ${err.message}`);
     }
@@ -760,15 +882,39 @@ export function startBot(): TelegramBot {
     if (!isAdmin(msg.from!.id)) return;
     const cmd = match![1].split(" ")[0];
     const knownCmds = [
-      "start", "addaccount", "removeaccount", "accounts",
-      "status", "timeslots", "history", "monitornow", "commentnow", "logs",
-      "watchpost", "unwatchpost", "watchedposts", "watcherhistory", "watchernow",
-      "commenturls", "commentaccounts", "quotetweet",
-      "monitoron", "monitoroff",
-      "addgroup", "removegroup", "addtopic", "removetopic", "listtopics", "detecttopic", "scantopics",
+      "start",
+      "addaccount",
+      "removeaccount",
+      "accounts",
+      "status",
+      "timeslots",
+      "history",
+      "monitornow",
+      "commentnow",
+      "logs",
+      "watchpost",
+      "unwatchpost",
+      "watchedposts",
+      "watcherhistory",
+      "watchernow",
+      "commenturls",
+      "commentaccounts",
+      "quotetweet",
+      "monitoron",
+      "monitoroff",
+      "addgroup",
+      "removegroup",
+      "addtopic",
+      "removetopic",
+      "listtopics",
+      "detecttopic",
+      "scantopics",
     ];
     if (!knownCmds.includes(cmd)) {
-      await safeSend(msg.chat.id, `❓ Command /${cmd} not found. Type /start to see available commands.`);
+      await safeSend(
+        msg.chat.id,
+        `❓ Command /${cmd} not found. Type /start to see available commands.`,
+      );
     }
   });
 

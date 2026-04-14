@@ -10,7 +10,8 @@ let myUserId: string | null = null;
 
 function getUserClient(): TwitterApi {
   if (!userClient) {
-    if (!config.hasTwitter) throw new Error("Twitter OAuth credentials not configured");
+    if (!config.hasTwitter)
+      throw new Error("Twitter OAuth credentials not configured");
     userClient = new TwitterApi({
       appKey: config.TWITTER_API_KEY,
       appSecret: config.TWITTER_API_SECRET,
@@ -59,7 +60,8 @@ let bearerClient: TwitterApi | null = null;
 
 function getBearerClient(): TwitterApi {
   if (!bearerClient) {
-    if (!config.hasBearerToken) throw new Error("TWITTER_BEARER_TOKEN not configured");
+    if (!config.hasBearerToken)
+      throw new Error("TWITTER_BEARER_TOKEN not configured");
     bearerClient = new TwitterApi(config.TWITTER_BEARER);
   }
   return bearerClient;
@@ -97,7 +99,9 @@ async function saveSinceId(tweetId: string, id: string): Promise<void> {
 
 // ── Fetch new commenters trên bài viết của mình ───────────────────────────────
 
-export async function fetchNewCommenters(watchedPostId: string): Promise<
+export async function fetchNewCommenters(
+  watchedPostId: string,
+): Promise<
   Array<{ commentId: string; commenterHandle: string; commenterUserId: string }>
 > {
   const client = getBearerClient();
@@ -133,8 +137,8 @@ export async function fetchNewCommenters(watchedPostId: string): Promise<
 
     return replies.map((r) => ({
       commentId: r.id,
-      commenterHandle: users[r.author_id] ?? "",
-      commenterUserId: r.author_id,
+      commenterHandle: users[r.author_id ?? ""] ?? "",
+      commenterUserId: r.author_id ?? "",
     }));
   } catch (err: any) {
     logger.error("watcher", `fetchNewCommenters error: ${err.message}`);
@@ -157,7 +161,9 @@ export async function getLatestTweetOfUser(
     const tweet = resp.data?.data?.[0];
     if (!tweet) return null;
 
-    const userResp = await client.v2.user(userId, { "user.fields": ["username"] });
+    const userResp = await client.v2.user(userId, {
+      "user.fields": ["username"],
+    });
     const handle = userResp.data?.username ?? "";
 
     return { tweetId: tweet.id, text: tweet.text, handle };

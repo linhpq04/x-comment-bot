@@ -9,6 +9,7 @@ import {
   createJob,
   generateQuoteContent,
   scheduleQuoteJob,
+  type QuoteJob,
 } from "../quoter/quote-tweeter.js";
 import { TwitterApi } from "twitter-api-v2";
 
@@ -34,7 +35,12 @@ const states = new Map<number, QuoteState>(); // userId → state
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function safeSend(bot: TelegramBot, chatId: number, text: string, markdown = false) {
+async function safeSend(
+  bot: TelegramBot,
+  chatId: number,
+  text: string,
+  markdown = false,
+) {
   try {
     await bot.sendMessage(chatId, text, {
       parse_mode: markdown ? "Markdown" : undefined,
@@ -49,7 +55,9 @@ async function safeSend(bot: TelegramBot, chatId: number, text: string, markdown
   }
 }
 
-async function getTweetInfo(tweetId: string): Promise<{ text: string; handle: string } | null> {
+async function getTweetInfo(
+  tweetId: string,
+): Promise<{ text: string; handle: string } | null> {
   try {
     const client = new TwitterApi(config.TWITTER_BEARER);
     const resp = await client.v2.singleTweet(tweetId, {
@@ -77,10 +85,15 @@ async function downloadTelegramFile(
 
   await new Promise<void>((resolve, reject) => {
     const file = createWriteStream(destPath);
-    https.get(fileUrl, (res) => {
-      res.pipe(file);
-      file.on("finish", () => { file.close(); resolve(); });
-    }).on("error", reject);
+    https
+      .get(fileUrl, (res) => {
+        res.pipe(file);
+        file.on("finish", () => {
+          file.close();
+          resolve();
+        });
+      })
+      .on("error", reject);
   });
 
   return destPath;
@@ -108,18 +121,22 @@ async function dispatchJob(
     : "⚡ Đang đăng ngay...";
 
   await safeSend(
-    bot, chatId,
+    bot,
+    chatId,
     `✅ *Job đã tạo!*\n\n${scheduleInfo}\n` +
       `📝 _${job.content.slice(0, 100)}${job.content.length > 100 ? "…" : ""}_\n` +
       `${mediaPath ? "🖼 Có media đính kèm" : ""}`,
     true,
   );
 
-  await scheduleQuoteJob(job, async (doneJob) => {
+  await scheduleQuoteJob(job, async (doneJob: QuoteJob) => {
     if (doneJob.status === "done") {
-      const label = job.tweetId ? "🎉 *Quote tweet đã đăng!*" : "🎉 *Bài đã đăng!*";
+      const label = job.tweetId
+        ? "🎉 *Quote tweet đã đăng!*"
+        : "🎉 *Bài đã đăng!*";
       await safeSend(
-        bot, chatId,
+        bot,
+        chatId,
         `${label}\n🔗 https://x.com/i/web/status/${doneJob.postedId}`,
         true,
       );
@@ -135,7 +152,6 @@ export function registerQuoteHandlers(
   bot: TelegramBot,
   isAdmin: (id: number) => boolean,
 ): void {
-
   // /quotetweet [url] [HH:MM]  — url là optional
   //   Có link  → quote tweet
   //   Không link → đăng bài thường
@@ -161,10 +177,12 @@ export function registerQuoteHandlers(
     if (url) {
       tweetId = extractTweetId(url) ?? undefined;
       if (!tweetId) {
-        await safeSend(bot, chatId,
+        await safeSend(
+          bot,
+          chatId,
           "❌ URL không hợp lệ.\n" +
-          "Ví dụ có link: /quotetweet https://x.com/user/status/123\n" +
-          "Đăng bài thường: /quotetweet"
+            "Ví dụ có link: /quotetweet https://x.com/user/status/123\n" +
+            "Đăng bài thường: /quotetweet",
         );
         return;
       }
@@ -176,10 +194,16 @@ export function registerQuoteHandlers(
       const [h, m] = timeArg.split(":").map(Number);
       scheduledAt = new Date();
       scheduledAt.setHours(h, m, 0, 0);
-      if (scheduledAt <= new Date()) scheduledAt.setDate(scheduledAt.getDate() + 1);
+      if (scheduledAt <= new Date())
+        scheduledAt.setDate(scheduledAt.getDate() + 1);
     }
 
-    states.set(userId, { step: "await_content_mode", tweetId, tweetUrl: url, scheduledAt });
+    states.set(userId, {
+      step: "await_content_mode",
+      tweetId,
+      tweetUrl: url,
+      scheduledAt,
+    });
 
     const scheduleInfo = scheduledAt
       ? `\n⏰ Sẽ đăng lúc *${scheduledAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}*`
@@ -190,7 +214,8 @@ export function registerQuoteHandlers(
       : `📝 *Đăng bài thường* (không quote)${scheduleInfo}`;
 
     await safeSend(
-      bot, chatId,
+      bot,
+      chatId,
       `${modeInfo}\n\n` +
         `📝 *Nội dung bài?*\n\n` +
         `1️⃣  Tự viết\n` +
@@ -221,8 +246,11 @@ export function registerQuoteHandlers(
         await safeSend(bot, chatId, "✏️ Nhập nội dung bài trích dẫn:");
       } else if (choice === "2") {
         await safeSend(bot, chatId, "🤖 AI đang generate...");
-        const info = await getTweetInfo(state.tweetId);
-        const aiContent = await generateQuoteContent(info?.text ?? "", info?.handle ?? "");
+        const info = state.tweetId ? await getTweetInfo(state.tweetId) : null;
+        const aiContent = await generateQuoteContent(
+          info?.text ?? "",
+          info?.handle ?? "",
+        );
         if (!aiContent) {
           await safeSend(bot, chatId, "❌ AI thất bại. Bạn tự nhập nhé:");
           states.set(userId, { ...state, step: "await_content" });
@@ -230,7 +258,8 @@ export function registerQuoteHandlers(
         }
         states.set(userId, { ...state, step: "await_ai_confirm", aiContent });
         await safeSend(
-          bot, chatId,
+          bot,
+          chatId,
           `🤖 *AI generate:*\n\n_${aiContent}_\n\n` +
             `✅ *ok* — dùng ngay\n✏️ *edit* — tự viết lại\n🔄 *retry* — generate lại`,
           true,
@@ -244,10 +273,14 @@ export function registerQuoteHandlers(
     // ── await_content ─────────────────────────────────────────────────────
     if (state.step === "await_content") {
       const content = msg.text?.trim() ?? "";
-      if (!content) { await safeSend(bot, chatId, "⚠️ Nội dung không được để trống"); return; }
+      if (!content) {
+        await safeSend(bot, chatId, "⚠️ Nội dung không được để trống");
+        return;
+      }
       states.set(userId, { ...state, step: "await_media_choice", content });
       await safeSend(
-        bot, chatId,
+        bot,
+        chatId,
         `✅ Đã lưu nội dung:\n_${content}_\n\n` +
           `🖼 *Đính kèm ảnh/video không?*\n\n1️⃣  Có\n2️⃣  Không`,
         true,
@@ -259,9 +292,14 @@ export function registerQuoteHandlers(
     if (state.step === "await_ai_confirm") {
       const choice = msg.text?.trim().toLowerCase();
       if (choice === "ok") {
-        states.set(userId, { ...state, step: "await_media_choice", content: state.aiContent! });
+        states.set(userId, {
+          ...state,
+          step: "await_media_choice",
+          content: state.aiContent!,
+        });
         await safeSend(
-          bot, chatId,
+          bot,
+          chatId,
           `✅ Dùng nội dung AI!\n\n🖼 *Đính kèm ảnh/video không?*\n\n1️⃣  Có\n2️⃣  Không`,
           true,
         );
@@ -270,8 +308,11 @@ export function registerQuoteHandlers(
         await safeSend(bot, chatId, "✏️ Nhập nội dung của bạn:");
       } else if (choice === "retry") {
         await safeSend(bot, chatId, "🔄 Generate lại...");
-        const info = await getTweetInfo(state.tweetId);
-        const aiContent = await generateQuoteContent(info?.text ?? "", info?.handle ?? "");
+        const info = state.tweetId ? await getTweetInfo(state.tweetId) : null;
+        const aiContent = await generateQuoteContent(
+          info?.text ?? "",
+          info?.handle ?? "",
+        );
         if (!aiContent) {
           await safeSend(bot, chatId, "❌ AI thất bại lần nữa. Tự nhập đi:");
           states.set(userId, { ...state, step: "await_content" });
@@ -279,7 +320,8 @@ export function registerQuoteHandlers(
         }
         states.set(userId, { ...state, aiContent });
         await safeSend(
-          bot, chatId,
+          bot,
+          chatId,
           `🤖 *Generate mới:*\n\n_${aiContent}_\n\n✅ *ok* — ✏️ *edit* — 🔄 *retry*`,
           true,
         );

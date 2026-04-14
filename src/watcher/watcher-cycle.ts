@@ -1,8 +1,15 @@
 import { db } from "../db.js";
 import { logger } from "../utils/logger.js";
 import { generateComment } from "../generator/comment-generator.js";
-import { fetchNewCommenters, getLatestTweetOfUser, likeTweet } from "./post-watcher.js";
-import { ensureLogin, postCommentOnTweet } from "../commenter/twitter-commenter.js";
+import {
+  fetchNewCommenters,
+  getLatestTweetOfUser,
+  likeTweet,
+} from "./post-watcher.js";
+import {
+  ensureLogin,
+  postCommentOnTweet,
+} from "../commenter/twitter-commenter.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -25,8 +32,12 @@ function sleep(ms: number): Promise<void> {
 }
 
 function randomDelay(): Promise<void> {
-  const ms = DELAY_MIN_MS + Math.floor(Math.random() * (DELAY_MAX_MS - DELAY_MIN_MS));
-  logger.info("watcher", `⏱ Waiting ${Math.round(ms / 60000)} min before next comment...`);
+  const ms =
+    DELAY_MIN_MS + Math.floor(Math.random() * (DELAY_MAX_MS - DELAY_MIN_MS));
+  logger.info(
+    "watcher",
+    `⏱ Waiting ${Math.round(ms / 60000)} min before next comment...`,
+  );
   return sleep(ms);
 }
 
@@ -56,7 +67,10 @@ async function runOneCheckCycle(): Promise<void> {
   }> = [];
 
   for (const post of posts) {
-    logger.info("watcher", `🔍 Checking new comments on post ${post.tweetId}...`);
+    logger.info(
+      "watcher",
+      `🔍 Checking new comments on post ${post.tweetId}...`,
+    );
 
     let newCommenters: Array<{
       commentId: string;
@@ -84,7 +98,7 @@ async function runOneCheckCycle(): Promise<void> {
           where: { commentId: { in: commentIds } },
           select: { commentId: true },
         })
-      ).map((r) => r.commentId),
+      ).map((r: { commentId: string }) => r.commentId),
     );
 
     const fresh = newCommenters.filter((c) => !alreadyDone.has(c.commentId));
@@ -105,7 +119,10 @@ async function runOneCheckCycle(): Promise<void> {
     return;
   }
 
-  logger.info("watcher", `▶ Found ${toProcess.length} new commenter(s) — starting comment run`);
+  logger.info(
+    "watcher",
+    `▶ Found ${toProcess.length} new commenter(s) — starting comment run`,
+  );
 
   // Login before comment run
   const loggedIn = await ensureLogin();
@@ -126,7 +143,10 @@ async function runOneCheckCycle(): Promise<void> {
 
     // No handle → skip
     if (!commenter.commenterHandle) {
-      logger.warn("watcher", `No handle for userId ${commenter.commenterUserId}, skipping`);
+      logger.warn(
+        "watcher",
+        `No handle for userId ${commenter.commenterUserId}, skipping`,
+      );
       await db.watcherReaction.create({
         data: {
           watchedPostId: commenter.postId,
@@ -144,7 +164,10 @@ async function runOneCheckCycle(): Promise<void> {
     // Get their latest tweet
     const latestTweet = await getLatestTweetOfUser(commenter.commenterUserId);
     if (!latestTweet) {
-      logger.warn("watcher", `@${commenter.commenterHandle} has no recent tweet, skipping`);
+      logger.warn(
+        "watcher",
+        `@${commenter.commenterHandle} has no recent tweet, skipping`,
+      );
       await db.watcherReaction.create({
         data: {
           watchedPostId: commenter.postId,
@@ -160,7 +183,11 @@ async function runOneCheckCycle(): Promise<void> {
     }
 
     // AI generate comment from their tweet content
-    const commentText = await generateComment(latestTweet.text, latestTweet.handle, "en");
+    const commentText = await generateComment(
+      latestTweet.text,
+      latestTweet.handle,
+      "en",
+    );
     if (!commentText) {
       logger.warn("watcher", `AI failed for @${latestTweet.handle}, skipping`);
       continue;
@@ -192,7 +219,10 @@ async function runOneCheckCycle(): Promise<void> {
     });
 
     if (postedId) {
-      logger.info("watcher", `✅ Done @${latestTweet.handle}: "${commentText.slice(0, 60)}..."`);
+      logger.info(
+        "watcher",
+        `✅ Done @${latestTweet.handle}: "${commentText.slice(0, 60)}..."`,
+      );
     } else {
       logger.warn("watcher", `❌ Failed to comment on @${latestTweet.handle}`);
     }
@@ -204,7 +234,10 @@ async function runOneCheckCycle(): Promise<void> {
     }
   }
 
-  logger.info("watcher", `✅ Cycle done — processed ${toProcess.length} commenter(s)`);
+  logger.info(
+    "watcher",
+    `✅ Cycle done — processed ${toProcess.length} commenter(s)`,
+  );
 }
 
 // ── Independent watcher loop ──────────────────────────────────────────────────
@@ -230,7 +263,10 @@ async function watcherLoop(): Promise<void> {
     const elapsed = Date.now() - cycleStart;
     const waitMs = Math.max(0, CHECK_INTERVAL_MS - elapsed);
 
-    logger.info("watcher", `💤 Next check in ${Math.round(waitMs / 60000)} min`);
+    logger.info(
+      "watcher",
+      `💤 Next check in ${Math.round(waitMs / 60000)} min`,
+    );
     await sleep(waitMs);
   }
 

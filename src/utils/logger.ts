@@ -32,7 +32,9 @@ async function save(level: string, module: string, message: string) {
         take: count - 2000,
         select: { id: true },
       });
-      await db.log.deleteMany({ where: { id: { in: old.map((l) => l.id) } } });
+      await db.log.deleteMany({
+        where: { id: { in: old.map((l: { id: string }) => l.id) } },
+      });
     }
   } catch {
     // ignore DB errors in logger

@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data # SQLite db persistent
+      - ./twitter-cookies.json:/app/twitter-cookies.json:ro # cookie file nếu có
+    ports:
+      - "3000:3000"

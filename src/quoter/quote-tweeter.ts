@@ -1,6 +1,9 @@
 import { Page } from "playwright";
 import { existsSync, unlinkSync } from "fs";
-import { ensureLogin, getContextForQuoter } from "../commenter/twitter-commenter.js";
+import {
+  ensureLogin,
+  getContextForQuoter,
+} from "../commenter/twitter-commenter.js";
 import { generateComment } from "../generator/comment-generator.js";
 import { logger } from "../utils/logger.js";
 
@@ -8,12 +11,12 @@ import { logger } from "../utils/logger.js";
 
 export interface QuoteJob {
   id: string;
-  tweetId?: string;         // undefined = đăng bài thường (không quote)
-  tweetUrl?: string;        // undefined = đăng bài thường (không quote)
+  tweetId?: string; // undefined = đăng bài thường (không quote)
+  tweetUrl?: string; // undefined = đăng bài thường (không quote)
   contentMode: "manual" | "ai";
   content: string;
   mediaPath?: string;
-  scheduledAt?: Date;       // undefined = đăng ngay
+  scheduledAt?: Date; // undefined = đăng ngay
   status: "pending" | "done" | "failed";
   postedId?: string;
 }
@@ -59,7 +62,10 @@ export async function postQuoteTweet(
   try {
     const tweetUrl = `https://x.com/i/web/status/${tweetId}`;
     logger.info("quoter", `Navigating to tweet ${tweetId}...`);
-    await page.goto(tweetUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.goto(tweetUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
     await page.waitForTimeout(4000);
 
     await dismissBanner(page);
@@ -107,7 +113,12 @@ export async function postQuoteTweet(
         await fileInput.setInputFiles(mediaPath);
         await page
           .waitForSelector('[data-testid="attachments"]', { timeout: 30000 })
-          .catch(() => logger.warn("quoter", "Media preview not detected, continuing anyway"));
+          .catch(() =>
+            logger.warn(
+              "quoter",
+              "Media preview not detected, continuing anyway",
+            ),
+          );
         await page.waitForTimeout(2000);
       } else {
         logger.warn("quoter", "File input not found — skipping media");
@@ -149,7 +160,9 @@ export async function postQuoteTweet(
     await page.close();
     // Xóa file media tạm
     if (mediaPath && existsSync(mediaPath)) {
-      try { unlinkSync(mediaPath); } catch {}
+      try {
+        unlinkSync(mediaPath);
+      } catch {}
     }
   }
 }
@@ -165,7 +178,10 @@ export async function postPlainTweet(
 
   try {
     logger.info("quoter", "Navigating to X home to post plain tweet...");
-    await page.goto("https://x.com/home", { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.goto("https://x.com/home", {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
     await page.waitForTimeout(4000);
 
     await dismissBanner(page);
@@ -191,7 +207,12 @@ export async function postPlainTweet(
         await fileInput.setInputFiles(mediaPath);
         await page
           .waitForSelector('[data-testid="attachments"]', { timeout: 30000 })
-          .catch(() => logger.warn("quoter", "Media preview not detected, continuing anyway"));
+          .catch(() =>
+            logger.warn(
+              "quoter",
+              "Media preview not detected, continuing anyway",
+            ),
+          );
         await page.waitForTimeout(2000);
       } else {
         logger.warn("quoter", "File input not found — skipping media");
@@ -232,7 +253,9 @@ export async function postPlainTweet(
   } finally {
     await page.close();
     if (mediaPath && existsSync(mediaPath)) {
-      try { unlinkSync(mediaPath); } catch {}
+      try {
+        unlinkSync(mediaPath);
+      } catch {}
     }
   }
 }

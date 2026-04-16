@@ -2,6 +2,8 @@
 
 > Tự động reply tweet trên Twitter/X theo lịch — điều khiển hoàn toàn qua Telegram.
 
+🇺🇸 [English](./README.en.md)
+
 ---
 
 ## Mục lục
